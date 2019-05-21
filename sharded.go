@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// This is an experimental and unexported (for now) attempt at making a cache
+// ShardedCache This is an experimental and unexported (for now) attempt at making a cache
 // with better algorithmic complexity than the standard one, namely by
 // preventing write locks of the entire cache when an item is added. As of the
 // time of writing, the overhead of selecting buckets results in cache
@@ -18,7 +18,6 @@ import (
 // total cache sizes, and faster for larger ones.
 //
 // See cache_test.go for a few benchmarks.
-
 type ShardedCache struct {
 	*shardedCache
 }
@@ -178,6 +177,7 @@ func newShardedCache(n int, de time.Duration) *shardedCache {
 	return sc
 }
 
+// NewSharded sc
 func NewSharded(defaultExpiration, cleanupInterval time.Duration, shards int) *ShardedCache {
 	if defaultExpiration == 0 {
 		defaultExpiration = -1
