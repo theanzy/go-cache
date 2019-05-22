@@ -23,10 +23,11 @@ type ShardedCache struct {
 }
 
 type shardedCache struct {
-	seed    uint32
-	m       uint32
-	cs      []*cache
-	janitor *shardedJanitor
+	seed      uint32
+	m         uint32
+	onEvicted func(string, interface{})
+	cs        []*cache
+	janitor   *shardedJanitor
 }
 
 // djb2 with better shuffling. 5x faster than FNV with the hash.Hash overhead.
@@ -66,15 +67,27 @@ func (sc *shardedCache) bucket(k string) *cache {
 }
 
 func (sc *shardedCache) Set(k string, x interface{}, d time.Duration) {
-	sc.bucket(k).Set(k, x, d)
+	c := sc.bucket(k)
+	if sc.onEvicted != nil {
+		c.OnEvicted(sc.onEvicted)
+	}
+	c.Set(k, x, d)
 }
 
 func (sc *shardedCache) Add(k string, x interface{}, d time.Duration) error {
-	return sc.bucket(k).Add(k, x, d)
+	c := sc.bucket(k)
+	if sc.onEvicted != nil {
+		c.OnEvicted(sc.onEvicted)
+	}
+	return c.Add(k, x, d)
 }
 
 func (sc *shardedCache) Replace(k string, x interface{}, d time.Duration) error {
-	return sc.bucket(k).Replace(k, x, d)
+	c := sc.bucket(k)
+	if sc.onEvicted != nil {
+		c.OnEvicted(sc.onEvicted)
+	}
+	return c.Replace(k, x, d)
 }
 
 func (sc *shardedCache) Get(k string) (interface{}, bool) {
@@ -101,6 +114,10 @@ func (sc *shardedCache) DeleteExpired() {
 	for _, v := range sc.cs {
 		v.DeleteExpired()
 	}
+}
+
+func (sc *shardedCache) OnEvicted(f func(string, interface{})) {
+	sc.onEvicted = f
 }
 
 // Returns the items in the cache. This may include items that have expired,
