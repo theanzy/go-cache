@@ -75,6 +75,12 @@ func (sc *shardedCache) Set(k string, x interface{}, d time.Duration) {
 	atomic.AddUint32(&sc.count, 1)
 }
 
+func (sc *shardedCache) SetRenew(k string, x interface{}, d time.Duration) {
+	c := sc.bucket(k)
+	c.Set(k, x, d)
+	c.OnEvicted(sc.onEvicted)
+}
+
 func (sc *shardedCache) Add(k string, x interface{}, d time.Duration) error {
 	c := sc.bucket(k)
 	if sc.onEvicted != nil {
