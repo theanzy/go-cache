@@ -7,6 +7,7 @@ import (
 	insecurerand "math/rand"
 	"os"
 	"runtime"
+	"sync/atomic"
 	"time"
 )
 
@@ -25,6 +26,7 @@ type ShardedCache struct {
 type shardedCache struct {
 	seed      uint32
 	m         uint32
+	count     uint32
 	onEvicted func(string, interface{})
 	cs        []*cache
 	janitor   *shardedJanitor
@@ -70,6 +72,7 @@ func (sc *shardedCache) Set(k string, x interface{}, d time.Duration) {
 	c := sc.bucket(k)
 	c.Set(k, x, d)
 	c.OnEvicted(sc.onEvicted)
+	atomic.AddUint32(&sc.count, 1)
 
 }
 
@@ -107,6 +110,7 @@ func (sc *shardedCache) Decrement(k string, n int64) error {
 
 func (sc *shardedCache) Delete(k string) {
 	sc.bucket(k).Delete(k)
+	atomic.AddUint32(&sc.count, ^uint32(0))
 }
 
 func (sc *shardedCache) DeleteExpired() {
@@ -132,9 +136,14 @@ func (sc *shardedCache) Items() []map[string]Item {
 	return res
 }
 
+func (sc *shardedCache) ItemCount() uint32 {
+	return atomic.LoadUint32(&sc.count)
+}
+
 func (sc *shardedCache) Flush() {
 	for _, v := range sc.cs {
 		v.Flush()
+		atomic.AddUint32(&sc.count, ^uint32(v.ItemCount()-1))
 	}
 }
 
@@ -150,6 +159,7 @@ func (j *shardedJanitor) Run(sc *shardedCache) {
 		select {
 		case <-tick:
 			sc.DeleteExpired()
+			atomic.AddUint32(&sc.count, ^uint32(0))
 		case <-j.stop:
 			return
 		}
