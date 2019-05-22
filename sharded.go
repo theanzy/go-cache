@@ -73,7 +73,6 @@ func (sc *shardedCache) Set(k string, x interface{}, d time.Duration) {
 	c.Set(k, x, d)
 	c.OnEvicted(sc.onEvicted)
 	atomic.AddUint32(&sc.count, 1)
-
 }
 
 func (sc *shardedCache) Add(k string, x interface{}, d time.Duration) error {
@@ -111,11 +110,15 @@ func (sc *shardedCache) Decrement(k string, n int64) error {
 func (sc *shardedCache) Delete(k string) {
 	sc.bucket(k).Delete(k)
 	atomic.AddUint32(&sc.count, ^uint32(0))
+
 }
 
 func (sc *shardedCache) DeleteExpired() {
 	for _, v := range sc.cs {
-		v.DeleteExpired()
+		count := v.DeleteExpired()
+		if count > 0 {
+			atomic.AddUint32(&sc.count, ^uint32(count-1))
+		}
 	}
 }
 
@@ -143,7 +146,7 @@ func (sc *shardedCache) ItemCount() uint32 {
 func (sc *shardedCache) Flush() {
 	for _, v := range sc.cs {
 		v.Flush()
-		atomic.AddUint32(&sc.count, ^uint32(v.ItemCount()-1))
+		atomic.AddUint32(&sc.count, ^uint32(0))
 	}
 }
 
@@ -159,7 +162,7 @@ func (j *shardedJanitor) Run(sc *shardedCache) {
 		select {
 		case <-tick:
 			sc.DeleteExpired()
-			atomic.AddUint32(&sc.count, ^uint32(0))
+
 		case <-j.stop:
 			return
 		}
@@ -209,6 +212,7 @@ func NewSharded(defaultExpiration, cleanupInterval time.Duration, shards int) *S
 		defaultExpiration = -1
 	}
 	sc := newShardedCache(shards, defaultExpiration)
+	atomic.StoreUint32(&sc.count, 0)
 	SC := &ShardedCache{sc}
 	if cleanupInterval > 0 {
 		runShardedJanitor(sc, cleanupInterval)

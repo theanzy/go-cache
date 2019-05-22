@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -930,13 +931,15 @@ type keyAndValue struct {
 }
 
 // Delete all expired items from the cache.
-func (c *cache) DeleteExpired() {
+func (c *cache) DeleteExpired() uint32 {
 	var evictedItems []keyAndValue
 	now := time.Now().UnixNano()
 	c.mu.Lock()
+	var deletedCount uint32 = 0
 	for k, v := range c.items {
 		// "Inlining" of expired
 		if v.Expiration > 0 && now > v.Expiration {
+			atomic.AddUint32(&deletedCount, 1)
 			ov, evicted := c.delete(k)
 			if evicted {
 				evictedItems = append(evictedItems, keyAndValue{k, ov})
@@ -947,6 +950,7 @@ func (c *cache) DeleteExpired() {
 	for _, v := range evictedItems {
 		c.onEvicted(v.key, v.value)
 	}
+	return deletedCount
 }
 
 // Sets an (optional) function that is called with the key and value when an
