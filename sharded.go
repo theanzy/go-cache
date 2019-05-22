@@ -68,9 +68,9 @@ func (sc *shardedCache) bucket(k string) *cache {
 
 func (sc *shardedCache) Set(k string, x interface{}, d time.Duration) {
 	c := sc.bucket(k)
+	c.Set(k, x, d)
 	c.OnEvicted(sc.onEvicted)
 
-	c.Set(k, x, d)
 }
 
 func (sc *shardedCache) Add(k string, x interface{}, d time.Duration) error {
