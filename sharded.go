@@ -67,18 +67,20 @@ func djb33(seed uint32, k string) uint32 {
 func (sc *shardedCache) bucket(k string) *cache {
 	return sc.cs[djb33(sc.seed, k)%sc.m]
 }
-
+func (sc *shardedCache) SetDefault(k string, x interface{}) {
+	c := sc.bucket(k)
+	c.Set(k, x, c.defaultExpiration)
+	atomic.AddUint32(&sc.count, 1)
+}
 func (sc *shardedCache) Set(k string, x interface{}, d time.Duration) {
 	c := sc.bucket(k)
 	c.Set(k, x, d)
-	c.OnEvicted(sc.onEvicted)
 	atomic.AddUint32(&sc.count, 1)
 }
 
 func (sc *shardedCache) SetRenew(k string, x interface{}, d time.Duration) {
 	c := sc.bucket(k)
 	c.Set(k, x, d)
-	c.OnEvicted(sc.onEvicted)
 }
 
 func (sc *shardedCache) Add(k string, x interface{}, d time.Duration) error {
